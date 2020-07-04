@@ -47,6 +47,11 @@ Copyright Steve Daulton 2018
 Released under terms of the GNU General Public License version 2:
 <http://www.gnu.org/licenses/old-licenses/gpl-2.0.html />
 Modified by Angi Ye: 2020
+Dependencies: psutil, tkinter
+If you don't have these libraries installed, run the following
+python -m pip install --upgrade pip
+pip install psutil
+pip install tkinter
 """
 
 import os
@@ -56,6 +61,7 @@ import time
 import errno
 import argparse
 import subprocess
+import psutil
 from tkinter import *
 from tkinter import filedialog
 
@@ -119,6 +125,7 @@ class PipeClient():
         return self
 
     def __init__(self):
+        self.check_and_launch_audacity()
         self.timer = False
         self._start_time = 0
         self._write_pipe = None
@@ -126,6 +133,22 @@ class PipeClient():
         if not self._write_pipe:
             self._write_thread_start()
         self._read_thread_start()
+
+    def check_and_launch_audacity(self):
+        audacity_name = "audacity.exe"
+        process = filter(lambda p: p.name() == audacity_name, psutil.process_iter())
+        audacity_running = False
+        for p in psutil.process_iter():
+            if p.name() == audacity_name:
+                print (p)
+                audacity_running = True
+
+        if not audacity_running:
+            audacicy = os.getenv('PROGRAMFILES(X86)','C:\\Program Files (x86)') + '/Audacity/' + audacity_name
+            proc = subprocess.Popen([audacicy], stdout=subprocess.PIPE, shell=False)
+            if proc:
+                print('Started Audacity with PID = ', proc.pid)
+                time.sleep(2)
 
     def _write_thread_start(self):
         """Start _write_pipe thread"""
@@ -239,6 +262,8 @@ def send_message_to_audacity(client, message, timeout):
         else:
             reply = client.read()
     print(reply)
+
+
 
 vlc_player = os.getenv('PROGRAMFILES','C:\\Program Files') + '/VideoLAN/VLC/vlc.exe'
 client = PipeClient()
