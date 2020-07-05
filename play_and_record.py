@@ -62,17 +62,63 @@ import errno
 import argparse
 import subprocess
 import psutil
+import tkinter as tk
 from tkinter import *
 from tkinter import filedialog
+from tkinter import ttk
+from pathlib import Path, PureWindowsPath
 
+# GUI
 window = Tk()
 
 window.title('Play Video & Record Audio')
 
 window.geometry('500x70')
 filepathlbl = Label(window, text='vidoe file: mp4 or url')
-filepathtxt = Entry(window, width=60)
 
+playlist = []
+selected_vf = tk.StringVar()
+filepathlist = ttk.Combobox(window, width=50, textvariable = selected_vf)
+
+def combo_text_changed(event):
+    print ('video file changed to: ', selected_vf.get())
+    if not selected_vf.get() in playlist:
+        playlist.append(selected_vf.get())
+        filepathlist.config(values = playlist)
+
+filepathlist.bind('<Key-Return>', combo_text_changed)
+
+
+def browsefunc():
+    filename = filedialog.askopenfilename()
+    if filename:
+        pure_window_path = PureWindowsPath(Path(filename))
+        selected_vf.set(pure_window_path)
+
+browsebutton = Button(window, text='Browse', command=browsefunc)
+
+saved_playlist = 'vlc_playlist.txt'
+last_played = 'vlc_last_played.txt'
+
+def init_playlist():
+    if os.path.exists(saved_playlist):
+        with open(saved_playlist) as in_file:
+            playlist = [line for line in in_file]
+        filepathlist.config(values = playlist)
+    if (os.path.exists(last_played)):
+        with open(last_played) as in_file:
+            last_selected = in_file.read()
+            print (last_selected)
+            selected_vf.set(last_selected)
+
+def on_closing():
+    if selected_vf.get():
+        with open(last_played, 'w') as out_file:
+            out_file.write(selected_vf.get())
+    if playlist:
+        with open(saved_playlist, 'w') as out_file:
+            out_file.write('\n'.join(playlist))
+    window.destroy()
 if sys.version_info[0] < 3 and sys.version_info[1] < 7:
     sys.exit('PipeClient Error: Python 2.7 or later required')
 
@@ -270,8 +316,11 @@ client = PipeClient()
 timeout = 10
 
 def do_work():
+    vf = selected_vf.get().strip()
+    if vf:
         send_message_to_audacity(client, 'Record2ndChoice', timeout)
-        subprocess.call([vlc_player, filepathtxt.get(), '--width', '1080', '--height', '960'])
+        print('start VLC with file:', vf)
+        subprocess.call([vlc_player, vf, '--width', '1080', '--height', '960'])
         send_message_to_audacity(client, 'PlayStop', timeout)
 
 def abc():
@@ -302,14 +351,26 @@ def abc():
         if message.upper() == 'Q':
             sys.exit(0)
 
+
 # layout
 col = 0
-filepathlbl.grid(column=col, row=0)
+row = 0
+filepathlbl.grid(column=col, row=row)
 col+=1
-filepathtxt.grid(column=col, row=0)
-startbutton = Button(window, text='Start', command=do_work)
-startbutton.grid(column=0, row=1)
+filepathlist.grid(column=col, row=row)
 
+col+=1
+browsebutton.grid(column=col, row=0)
+
+row +=1
+col = 0
+startbutton = Button(window, text='Start', command=do_work)
+startbutton.grid(column=0, row=row)
+
+# load playlist
+init_playlist()
+
+window.protocol("WM_DELETE_WINDOW", on_closing)
 window.mainloop()
 
 #if __name__ == '__main__':
